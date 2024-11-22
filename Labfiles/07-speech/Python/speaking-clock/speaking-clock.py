@@ -3,7 +3,8 @@ from datetime import datetime
 import os
 
 # Import namespaces
-
+import azure.cognitiveservices.speech as speech_sdk
+from playsound import playsound
 
 def main():
     try:
@@ -13,14 +14,24 @@ def main():
         load_dotenv()
         ai_key = os.getenv('SPEECH_KEY')
         ai_region = os.getenv('SPEECH_REGION')
+        language = 'es-ES'
 
         # Configure speech service
-        
+        speech_config = speech_sdk.SpeechConfig(ai_key, ai_region, speech_recognition_language=language)
+        print('Ready to use speech service in:', speech_config.region)
+        print('The recognized language is:', language)
 
         # Get spoken input
         command = TranscribeCommand()
-        if command.lower() == 'what time is it?':
+        if language == 'es-ES':
+            question = '¿qué hora es?'
+        else:
+            question = 'what time is it?'
+
+        if command.lower() == question:
             TellTime()
+        else:
+            print('unrecognized question')
 
     except Exception as ex:
         print(ex)
@@ -29,10 +40,22 @@ def TranscribeCommand():
     command = ''
 
     # Configure speech recognition
-
+    audio_config = speech_sdk.AudioConfig(use_default_microphone=True)
+    speech_recognizer = speech_sdk.SpeechRecognizer(speech_config, audio_config)
+    
+    print('Speak now...')
 
     # Process speech input
-
+    speech = speech_recognizer.recognize_once_async().get()
+    if speech.reason == speech_sdk.ResultReason.RecognizedSpeech:
+        command = speech.text
+        print(command)
+    else:
+        print(speech.reason)
+        if speech.reason == speech_sdk.ResultReason.Canceled:
+            cancellation = speech.cancellation_details
+            print(cancellation.reason)
+            print(cancellation.error_details)
 
     # Return the command
     return command
@@ -42,12 +65,14 @@ def TellTime():
     now = datetime.now()
     response_text = 'The time is {}:{:02d}'.format(now.hour,now.minute)
 
-
     # Configure speech synthesis
-    
+    speech_config.speech_synthesis_voice_name = "en-GB-RyanNeural"
+    speech_synthesizer = speech_sdk.SpeechSynthesizer(speech_config)
 
     # Synthesize spoken output
-
+    speak = speech_synthesizer.speak_text_async(response_text).get()
+    if speak.reason != speech_sdk.ResultReason.SynthesizingAudioCompleted:
+        print(speak.reason)
 
     # Print the response
     print(response_text)
